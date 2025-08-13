@@ -1,103 +1,328 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+
+type Choice = 'rock' | 'paper' | 'scissors'
+type GameResult = 'win' | 'lose' | 'tie'
+
+interface GameStats {
+  wins: number
+  losses: number
+  ties: number
+  totalGames: number
+  points: number
+}
+
+interface GameHistory {
+  playerChoice: Choice
+  botChoice: Choice
+  result: GameResult
+  timestamp: number
+}
+
+const CHOICE_EMOJIS: Record<Choice, string> = {
+  rock: '🪨',
+  paper: '📄',
+  scissors: '✂️'
+}
+
+const CHOICE_NAMES: Record<Choice, string> = {
+  rock: 'Rock',
+  paper: 'Paper',
+  scissors: 'Scissors'
+}
+
+const POINTS_SYSTEM = {
+  win: 3,
+  tie: 1,
+  lose: 0
+}
+
+export default function RockPaperScissorsGame() {
+  const [stats, setStats] = useState<GameStats>({
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    totalGames: 0,
+    points: 0
+  })
+  
+  const [gameHistory, setGameHistory] = useState<GameHistory[]>([])
+  const [lastGame, setLastGame] = useState<GameHistory | null>(null)
+  const [isPlaying, setIsPlaying] = useState<boolean>(false)
+  const [showResult, setShowResult] = useState<boolean>(false)
+
+  // Load saved data on component mount
+  useEffect(() => {
+    const savedStats = localStorage.getItem('rps-stats')
+    const savedHistory = localStorage.getItem('rps-history')
+    
+    if (savedStats) {
+      setStats(JSON.parse(savedStats))
+    }
+    
+    if (savedHistory) {
+      setGameHistory(JSON.parse(savedHistory))
+    }
+  }, [])
+
+  // Save data whenever stats or history change
+  useEffect(() => {
+    localStorage.setItem('rps-stats', JSON.stringify(stats))
+  }, [stats])
+
+  useEffect(() => {
+    localStorage.setItem('rps-history', JSON.stringify(gameHistory))
+  }, [gameHistory])
+
+  const getBotChoice = (): Choice => {
+    const choices: Choice[] = ['rock', 'paper', 'scissors']
+    return choices[Math.floor(Math.random() * choices.length)]
+  }
+
+  const determineWinner = (playerChoice: Choice, botChoice: Choice): GameResult => {
+    if (playerChoice === botChoice) return 'tie'
+    
+    const winConditions: Record<Choice, Choice> = {
+      rock: 'scissors',
+      paper: 'rock',
+      scissors: 'paper'
+    }
+    
+    return winConditions[playerChoice] === botChoice ? 'win' : 'lose'
+  }
+
+  const playGame = async (playerChoice: Choice): Promise<void> => {
+    if (isPlaying) return
+
+    setIsPlaying(true)
+    setShowResult(false)
+
+    // Add slight delay for better UX
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    const botChoice = getBotChoice()
+    const result = determineWinner(playerChoice, botChoice)
+    
+    const game: GameHistory = {
+      playerChoice,
+      botChoice,
+      result,
+      timestamp: Date.now()
+    }
+
+    const pointsEarned = POINTS_SYSTEM[result]
+    
+    setStats(prevStats => ({
+      ...prevStats,
+      wins: result === 'win' ? prevStats.wins + 1 : prevStats.wins,
+      losses: result === 'lose' ? prevStats.losses + 1 : prevStats.losses,
+      ties: result === 'tie' ? prevStats.ties + 1 : prevStats.ties,
+      totalGames: prevStats.totalGames + 1,
+      points: prevStats.points + pointsEarned
+    }))
+
+    setGameHistory(prev => [game, ...prev.slice(0, 9)]) // Keep last 10 games
+    setLastGame(game)
+    setShowResult(true)
+    setIsPlaying(false)
+  }
+
+  const resetStats = (): void => {
+    setStats({
+      wins: 0,
+      losses: 0,
+      ties: 0,
+      totalGames: 0,
+      points: 0
+    })
+    setGameHistory([])
+    setLastGame(null)
+    setShowResult(false)
+  }
+
+  const getResultMessage = (result: GameResult): string => {
+    switch (result) {
+      case 'win':
+        return '🎉 You Win!'
+      case 'lose':
+        return '😅 Bot Wins!'
+      case 'tie':
+        return '🤝 It\'s a Tie!'
+    }
+  }
+
+  const getResultColor = (result: GameResult): string => {
+    switch (result) {
+      case 'win':
+        return 'bg-green-500'
+      case 'lose':
+        return 'bg-red-500'
+      case 'tie':
+        return 'bg-yellow-500'
+    }
+  }
+
+  const winRate = stats.totalGames > 0 ? Math.round((stats.wins / stats.totalGames) * 100) : 0
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center py-6">
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">
+            🎮 Rock Paper Scissors
+          </h1>
+          <p className="text-gray-600">
+            Play against the bot and earn points!
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+
+        {/* Stats Overview */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">📊 Your Stats</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-green-600">{stats.points}</div>
+                <div className="text-sm text-gray-500">Points</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-blue-600">{stats.totalGames}</div>
+                <div className="text-sm text-gray-500">Games</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-green-500">{stats.wins}</div>
+                <div className="text-sm text-gray-500">Wins</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-red-500">{stats.losses}</div>
+                <div className="text-sm text-gray-500">Losses</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-yellow-500">{winRate}%</div>
+                <div className="text-sm text-gray-500">Win Rate</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Game Area */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">
+              {isPlaying ? '🤖 Bot is thinking...' : '🎯 Make Your Choice'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Game Result Display */}
+            {showResult && lastGame && (
+              <div className="mb-6 p-4 rounded-lg bg-gray-50 border">
+                <div className="text-center space-y-3">
+                  <div className="flex justify-center items-center space-x-8">
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">{CHOICE_EMOJIS[lastGame.playerChoice]}</div>
+                      <div className="font-medium">You</div>
+                      <div className="text-sm text-gray-500">{CHOICE_NAMES[lastGame.playerChoice]}</div>
+                    </div>
+                    
+                    <div className="text-2xl font-bold text-gray-400">VS</div>
+                    
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">{CHOICE_EMOJIS[lastGame.botChoice]}</div>
+                      <div className="font-medium">Bot</div>
+                      <div className="text-sm text-gray-500">{CHOICE_NAMES[lastGame.botChoice]}</div>
+                    </div>
+                  </div>
+                  
+                  <Badge className={`${getResultColor(lastGame.result)} text-white px-4 py-2 text-lg`}>
+                    {getResultMessage(lastGame.result)}
+                  </Badge>
+                  
+                  <div className="text-sm text-gray-600">
+                    +{POINTS_SYSTEM[lastGame.result]} points earned
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Choice Buttons */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(['rock', 'paper', 'scissors'] as Choice[]).map((choice) => (
+                <Button
+                  key={choice}
+                  onClick={() => playGame(choice)}
+                  disabled={isPlaying}
+                  className="h-24 text-xl font-semibold hover:scale-105 transition-transform"
+                  variant="outline"
+                >
+                  <div className="text-center">
+                    <div className="text-3xl mb-1">{CHOICE_EMOJIS[choice]}</div>
+                    <div>{CHOICE_NAMES[choice]}</div>
+                  </div>
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Game History */}
+        {gameHistory.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>📝 Recent Games</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {gameHistory.map((game, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-lg">{CHOICE_EMOJIS[game.playerChoice]}</span>
+                      <span className="text-gray-400">vs</span>
+                      <span className="text-lg">{CHOICE_EMOJIS[game.botChoice]}</span>
+                    </div>
+                    <Badge 
+                      className={`${getResultColor(game.result)} text-white`}
+                      variant="outline"
+                    >
+                      {game.result === 'win' ? 'Won' : game.result === 'lose' ? 'Lost' : 'Tie'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Reset Button */}
+        {stats.totalGames > 0 && (
+          <div className="text-center">
+            <Button onClick={resetStats} variant="outline" className="text-red-600 hover:text-red-700">
+              🔄 Reset All Stats
+            </Button>
+          </div>
+        )}
+
+        {/* Rules */}
+        <Card>
+          <CardHeader>
+            <CardTitle>📖 Game Rules & Scoring</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-gray-600 space-y-2">
+            <div>• <strong>Rock</strong> beats Scissors</div>
+            <div>• <strong>Paper</strong> beats Rock</div>
+            <div>• <strong>Scissors</strong> beats Paper</div>
+            <Separator className="my-4" />
+            <div><strong>Points:</strong> Win = 3 points, Tie = 1 point, Loss = 0 points</div>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
+  )
 }
